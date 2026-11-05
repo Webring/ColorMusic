@@ -85,12 +85,15 @@
 #define MID_COLOR HUE_GREEN       // цвет средних
 #define HIGH_COLOR HUE_YELLOW     // цвет высоких
 
-// ----- режим стробоскопа
-#define STROBE_PERIOD 140         // период вспышек, миллисекунды
-#define STROBE_DUTY 20            // скважность вспышек (1 - 99) - отношение времени вспышки ко времени темноты
-#define STROBE_COLOR HUE_YELLOW   // цвет стробоскопа
-#define STROBE_SAT 0              // насыщенность. Если 0 - цвет будет БЕЛЫЙ при любом цвете (0 - 255)
-#define STROBE_SMOOTH 200         // скорость нарастания/угасания вспышки (0 - 255)
+// ----- режим огня
+#define FIRE_HUE 0                // цвет огня (0 красный, 80 зелёный, 140 молния, 190 розовый)
+#define FIRE_SPEED 20             // скорость движения пламени
+#define FIRE_SCALE 15             // масштаб пламени: меньше - крупнее языки
+#define FIRE_HUE_GAP 21           // разброс цвета от FIRE_HUE
+#define FIRE_MIN_BRIGHT 70        // мин. яркость пламени
+#define FIRE_MAX_BRIGHT 255       // макс. яркость пламени
+#define FIRE_MIN_SAT 245          // мин. насыщенность
+#define FIRE_MAX_SAT 255          // макс. насыщенность
 
 // ----- режим подсветки
 #define LIGHT_COLOR 0             // начальный цвет подсветки
@@ -155,7 +158,7 @@ const ModeDesc modeList[] PROGMEM = {
   {FiveStripesMode::update,   nullptr,             0},              // 2 - цветомузыка, 5 полос
   {ThreeStripesMode::update,  nullptr,             0},              // 3 - цветомузыка, 3 полосы
   {FlashMode::update,         nullptr,             0},              // 4 - цветомузыка, вспышки (P_FREQ_STROBE_MODE)
-  {StrobeMode::update,        StrobeMode::onEvent, 0},              // 5 - стробоскоп
+  {FireMode::update,          nullptr,             0},              // 5 - огонь
   {LightMode::update,         nullptr,             0},              // 6 - подсветка (P_LIGHT_MODE)
   {RunningMode::update,       nullptr,             MODE_NO_CLEAR},  // 7 - бегущие частоты (P_FREQ_STROBE_MODE)
   {SpectrumMode::update,      nullptr,             0},              // 8 - анализатор спектра
@@ -176,8 +179,8 @@ const ParamMeta paramMeta[] PROGMEM = {
   {5,       100,            FIX100(SMOOTH_FREQ)},     // P_SMOOTH_FREQ, сотые
   {0,       100,            FIX10(MAX_COEF_FREQ)},    // P_MAX_COEF_FREQ, десятые
   {0,       3,              0},                       // P_FREQ_STROBE_MODE
-  {1,       1000,           STROBE_PERIOD},           // P_STROBE_PERIOD
-  {0,       255,            STROBE_SMOOTH},           // P_STROBE_SMOOTH
+  {0,       255,            FIRE_HUE},                // P_FIRE_HUE
+  {1,       100,            FIRE_SPEED},              // P_FIRE_SPEED
   {0,       2,              0},                       // P_LIGHT_MODE
   {0,       255,            LIGHT_COLOR},             // P_LIGHT_COLOR
   {0,       255,            LIGHT_SAT},               // P_LIGHT_SAT
@@ -187,6 +190,7 @@ const ParamMeta paramMeta[] PROGMEM = {
   {1,       255,            RUNNING_SPEED},           // P_RUNNING_SPEED
   {0,       255,            HUE_START},               // P_HUE_START
   {1,       255,            HUE_STEP},                // P_HUE_STEP
+  {1,       100,            FIRE_SCALE},              // P_FIRE_SCALE
 };
 static_assert(sizeof(paramMeta) / sizeof(paramMeta[0]) == P_COUNT, "paramMeta[] не совпадает с ParamId");
 

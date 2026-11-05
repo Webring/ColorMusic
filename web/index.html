@@ -153,8 +153,8 @@ const P = [
   { id: 8,  name: 'Плавность',             min: 5,   max: 100,  def: 80,  scale: 100 },
   { id: 9,  name: 'Порог вспышки',         min: 0,   max: 100,  def: 12,  scale: 10, hint: 'Меньше — чувствительнее' },
   { id: 10, name: 'Частоты',               min: 0,   max: 3,    def: 0,   options: ['Все', 'Высокие', 'Средние', 'Низкие'] },
-  { id: 11, name: 'Период вспышек',        min: 1,   max: 1000, def: 140, unit: 'мс' },
-  { id: 12, name: 'Резкость вспышки',      min: 0,   max: 255,  def: 200 },
+  { id: 11, name: 'Цвет огня',             min: 0,   max: 255,  def: 0,   hue: true, hint: '0 — красный, 80 — зелёный, 140 — молния, 190 — розовый' },
+  { id: 12, name: 'Скорость пламени',      min: 1,   max: 100,  def: 20 },
   { id: 13, name: 'Подрежим',              min: 0,   max: 2,    def: 0,   options: ['Цвет', 'Смена цвета', 'Радуга'] },
   { id: 14, name: 'Цвет',                  min: 0,   max: 255,  def: 0,   hue: true },
   { id: 15, name: 'Насыщенность',          min: 0,   max: 255,  def: 255 },
@@ -164,6 +164,7 @@ const P = [
   { id: 19, name: 'Период сдвига',         min: 1,   max: 255,  def: 11,  unit: 'мс' },
   { id: 20, name: 'Начальный цвет',        min: 0,   max: 255,  def: 0,   hue: true },
   { id: 21, name: 'Шаг цвета',             min: 1,   max: 255,  def: 5 },
+  { id: 22, name: 'Масштаб пламени',       min: 1,   max: 100,  def: 15,  hint: 'Меньше — крупнее языки' },
 ];
 const P_MODE = 0, P_POWER = 1, P_LIGHT_MODE = 13;
 
@@ -173,7 +174,7 @@ const MODES = [
   { name: 'Цветомузыка: 5 полос', params: [8, 9],       thumb: 'linear-gradient(90deg,#fd0 20%,#2c4 20% 40%,#f22 40% 60%,#2c4 60% 80%,#fd0 80%)' },
   { name: 'Цветомузыка: 3 полосы', params: [8, 9],      thumb: 'linear-gradient(90deg,#fd0 33%,#2c4 33% 66%,#f22 66%)' },
   { name: 'Вспышки',              params: [10, 8, 9],   thumb: 'linear-gradient(90deg,#2c4,#2c4)' },
-  { name: 'Стробоскоп',           params: [11, 12],     thumb: 'repeating-linear-gradient(90deg,#fff 0 10px,#222 10px 22px)' },
+  { name: 'Огонь',                params: [11, 12, 22], thumb: 'linear-gradient(90deg,#e01000,#ff5a00,#ffb000,#ff3c00,#c00800,#ff7a00,#ffc840,#e02000)' },
   { name: 'Подсветка',            params: [13],         thumb: 'linear-gradient(90deg,#a4f,#f4a)' },
   { name: 'Бегущие частоты',      params: [10, 19, 9, 8], thumb: 'linear-gradient(90deg,#f22,#2c4,#fd0,#2c4,#f22)' },
   { name: 'Анализатор спектра',   params: [20, 21],     thumb: 'linear-gradient(90deg,#f00 0 8%,#333 8% 14%,#fa0 14% 30%,#333 30% 36%,#ff0 36% 64%,#333 64% 70%,#fa0 70% 86%,#333 86% 92%,#f00 92%)' },

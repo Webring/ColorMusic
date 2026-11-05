@@ -1,49 +1,23 @@
 #pragma once
-// Режимы, не зависящие от звука: стробоскоп и подсветка
+// Режимы, не зависящие от звука: огонь и подсветка
 
-// 6 - стробоскоп
-namespace StrobeMode {
+// 6 - огонь на шуме Перлина (по мотивам FireFX, AlexGyver, MIT).
+// Цвет каждого светодиода берётся из 2D-шума: по ленте - позиция, по второй оси - время.
+// Чем больше значение шума, тем сильнее сдвиг цвета, ниже насыщенность и выше яркость
+namespace FireMode {
+  uint16_t counter;       // "время" шума
   unsigned long timer;
-  int bright;
-  boolean up, down;
 
   void update() {
-    unsigned long lightTime = (long)param(P_STROBE_PERIOD) * STROBE_DUTY / 100;  // длительность вспышки
-    if (millis() - timer > (unsigned long)param(P_STROBE_PERIOD)) {
+    if (millis() - timer > 20) {
       timer = millis();
-      up = true;
-      down = false;
+      counter += param(P_FIRE_SPEED);
     }
-    if (millis() - timer > lightTime) {
-      down = true;
-    }
-    if (up) {                             // если настало время пыхнуть
-      if (bright < 255)                   // если яркость не максимальная
-        bright += param(P_STROBE_SMOOTH); // увелчить
-      if (bright > 255) {                 // если пробили макс. яркость
-        bright = 255;                     // оставить максимум
-        up = false;                       // флаг опустить
-      }
-    }
-    if (down) {                           // гаснем
-      if (bright > 0)                     // если яркость не минимальная
-        bright -= param(P_STROBE_SMOOTH); // уменьшить
-      if (bright < 0) {                   // если пробили мин. яркость
-        down = false;
-        bright = 0;                       // оставить 0
-      }
-    }
-
-    if (bright > 0) fill_solid(leds, NUM_LEDS, CHSV(STROBE_COLOR, STROBE_SAT, bright));
-    else fill_solid(leds, NUM_LEDS, CHSV(EMPTY_COLOR, 255, param(P_EMPTY_BRIGHT)));
-  }
-
-  void onEvent(const Event &e) {
-    // при включении режима начинаем с тёмной ленты, первая вспышка - сразу
-    if (e.type == EV_ENTER) {
-      bright = 0;
-      up = down = false;
-      timer = millis() - param(P_STROBE_PERIOD) - 1;
+    for (int i = 0; i < NUM_LEDS; i++) {
+      byte val = inoise8((uint16_t)(i * param(P_FIRE_SCALE)), counter);
+      leds[i] = CHSV(param(P_FIRE_HUE) + map(val, 0, 255, 0, FIRE_HUE_GAP),
+                     constrain(map(val, 0, 255, FIRE_MAX_SAT, FIRE_MIN_SAT), 0, 255),
+                     constrain(map(val, 0, 255, FIRE_MIN_BRIGHT, FIRE_MAX_BRIGHT), 0, 255));
     }
   }
 }
