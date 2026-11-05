@@ -1,0 +1,15 @@
+# PlatformIO
+.pio/
+.vscode/
+
+# сертификат моста (web/server.py --https), создаётся автоматически
+web/.cert/
+
+# Python
+__pycache__/
+*.pyc
+
+# системный мусор
+.DS_Store
+Thumbs.db
+*~
