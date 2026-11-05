@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Светомузыка</title>
+<style>
+  :root {
+    --bg: var(--background, #0f1115);
+    --fg: var(--foreground, #e7e9ee);
+    --card-bg: var(--card, #181b22);
+    --line: var(--border, #2a2f3a);
+    --dim: var(--muted-foreground, #8a91a0);
+    --acc: var(--primary, #7c8cff);
+    --acc-fg: var(--primary-foreground, #0f1115);
+    --ok: var(--success, #3ecf8e);
+    --bad: var(--destructive, #ff5d6c);
+    --r: var(--radius, 10px);
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { background: var(--bg); color: var(--fg); }
+  body { margin: 0; font: 14px/1.4 var(--font-sans, system-ui, sans-serif); }
+  .wrap { max-width: 792px; margin: 0 auto; padding: 16px; display: grid; gap: 14px; }
+  .bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .bar h1 { font-size: 18px; margin: 0 auto 0 0; }
+  .status { display: inline-flex; align-items: center; gap: 6px; color: var(--dim); }
+  .status i { width: 8px; height: 8px; border-radius: 50%; background: var(--bad); }
+  .status.on i { background: var(--ok); }
+  button {
+    font: inherit; color: var(--fg); background: var(--card-bg); border: 1px solid var(--line);
+    border-radius: var(--r); padding: 7px 12px; cursor: pointer;
+  }
+  button:hover:not(:disabled) { border-color: var(--acc); }
+  button:disabled { opacity: .45; cursor: default; }
+  button.primary { background: var(--acc); color: var(--acc-fg); border-color: var(--acc); }
+  .card { background: var(--card-bg); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; }
+  .card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--dim); margin: 0 0 12px; font-weight: 600; }
+  .note { color: var(--dim); font-size: 13px; }
+  .note code { font-family: var(--font-mono, monospace); }
+
+  .modes { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+  .mode { text-align: left; padding: 8px; display: grid; gap: 6px; }
+  .mode.active { border-color: var(--acc); box-shadow: 0 0 0 1px var(--acc) inset; }
+  .mode b { font-weight: 500; font-size: 13px; }
+  .thumb { height: 14px; border-radius: 4px; }
+
+  .params { display: grid; gap: 14px; }
+  .param { display: grid; gap: 6px; align-content: start; }
+  .param .head { display: flex; justify-content: space-between; gap: 8px; }
+  .param .val { font-family: var(--font-mono, monospace); color: var(--dim); }
+  .param .hint { color: var(--dim); font-size: 12px; }
+  input[type=range] { width: 100%; accent-color: var(--acc); margin: 0; }
+  input[type=range].hue {
+    appearance: none; height: 12px; border-radius: 6px;
+    background: linear-gradient(90deg, hsl(0 90% 55%), hsl(60 90% 55%), hsl(120 90% 55%), hsl(180 90% 55%), hsl(240 90% 55%), hsl(300 90% 55%), hsl(360 90% 55%));
+  }
+  input[type=range].hue::-webkit-slider-thumb { appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #fff; border: 2px solid #0008; }
+  input[type=range].hue::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: #fff; border: 2px solid #0008; }
+  .seg { display: flex; flex-wrap: wrap; gap: 6px; }
+  .seg button { padding: 5px 10px; }
+  .seg button.active { background: var(--acc); color: var(--acc-fg); border-color: var(--acc); }
+  .sources { flex: 1; }
+  .sources button { display: grid; text-align: left; gap: 2px; flex: 1; min-width: 150px; padding: 8px 12px; }
+  .sources button b { font-weight: 600; }
+  .sources button small { color: var(--dim); font-size: 12px; }
+  .sources button.active small { color: inherit; opacity: .8; }
+  .swatch { display: inline-block; width: 14px; height: 14px; border-radius: 4px; vertical-align: -2px; margin-right: 6px; border: 1px solid #0006; }
+
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  .power { min-width: 96px; }
+  .power.on { background: var(--ok); border-color: var(--ok); color: #0b1a12; }
+
+  details summary { cursor: pointer; color: var(--dim); }
+  #log {
+    margin: 10px 0 0; max-height: 180px; overflow: auto; font: 12px/1.5 var(--font-mono, monospace);
+    color: var(--dim); white-space: pre-wrap;
+  }
+  .offline .needs-link { opacity: .45; pointer-events: none; }
+</style>
+</head>
+<body>
+<div class="wrap offline" id="app">
+  <div class="bar">
+    <h1>Светомузыка</h1>
+    <span class="status" id="status"><i></i><span>не подключено</span></span>
+  </div>
+
+  <div class="card">
+    <h2>Подключение</h2>
+    <div class="bar">
+      <div class="seg sources" id="sources">
+        <button data-src="bridge"><b>Сервер</b><small></small></button>
+        <button data-src="serial"><b>USB</b><small></small></button>
+        <button data-src="demo"><b>Демо</b><small></small></button>
+      </div>
+      <button class="primary" id="btnConnect">Подключить</button>
+    </div>
+  </div>
+
+  <div class="card needs-link">
+    <h2>Общее</h2>
+    <div class="grid2" id="general"></div>
+    <div class="actions">
+      <button class="power" id="btnPower">Выкл</button>
+    </div>
+  </div>
+
+  <div class="card needs-link">
+    <h2>Режим</h2>
+    <div class="modes" id="modes"></div>
+  </div>
+
+  <div class="card needs-link">
+    <h2 id="modeTitle">Настройки режима</h2>
+    <div class="params" id="modeParams"></div>
+  </div>
+
+  <div class="card needs-link">
+    <h2>Шумы и память</h2>
+    <div class="grid2" id="noise"></div>
+    <div class="actions">
+      <button id="btnCalibrate" title="Поставь музыку на паузу перед калибровкой">Калибровка шума</button>
+      <button id="btnSave">Сохранить в EEPROM</button>
+      <button id="btnReset">Сброс по умолчанию</button>
+    </div>
+    <div class="note" style="margin-top:8px">Перед калибровкой поставь музыку на паузу. Изменения сохраняются в память
+      сами через 30 секунд после последней правки.</div>
+  </div>
+
+  <details class="card">
+    <summary>Журнал обмена</summary>
+    <div id="log"></div>
+  </details>
+</div>
+
+<script>
+// ---------- протокол (firmware/colorMusic_v3.0/Control.h) ----------
+const START = 0xA5;
+const CMD = { SET: 1, ADD: 2, GET: 3, EVENT: 4, SAVE: 5, RESET: 6, CALIBRATE: 7, VALUE: 0x80 };
+
+// параметры (firmware/colorMusic_v3.0/Params.h + paramMeta[] в .ino). scale - делитель фиксированной точки
+const P = [
+  { id: 0,  name: 'Режим',                 min: 0,   max: 8,    def: 0 },
+  { id: 1,  name: 'Питание',               min: 0,   max: 1,    def: 1 },
+  { id: 2,  name: 'Яркость',               min: 0,   max: 255,  def: 200 },
+  { id: 3,  name: 'Яркость фона',          min: 0,   max: 255,  def: 30, hint: 'Подсветка «не горящих» светодиодов' },
+  { id: 4,  name: 'Порог шума: громкость', min: 0,   max: 1023, def: 100 },
+  { id: 5,  name: 'Порог шума: частоты',   min: 0,   max: 255,  def: 40 },
+  { id: 6,  name: 'Плавность',             min: 5,   max: 100,  def: 30,  scale: 100 },
+  { id: 7,  name: 'Скорость радуги',       min: 5,   max: 200,  def: 50,  scale: 10 },
+  { id: 8,  name: 'Плавность',             min: 5,   max: 100,  def: 80,  scale: 100 },
+  { id: 9,  name: 'Порог вспышки',         min: 0,   max: 100,  def: 12,  scale: 10, hint: 'Меньше — чувствительнее' },
+  { id: 10, name: 'Частоты',               min: 0,   max: 3,    def: 0,   options: ['Все', 'Высокие', 'Средние', 'Низкие'] },
+  { id: 11, name: 'Период вспышек',        min: 1,   max: 1000, def: 140, unit: 'мс' },
+  { id: 12, name: 'Резкость вспышки',      min: 0,   max: 255,  def: 200 },
+  { id: 13, name: 'Подрежим',              min: 0,   max: 2,    def: 0,   options: ['Цвет', 'Смена цвета', 'Радуга'] },
+  { id: 14, name: 'Цвет',                  min: 0,   max: 255,  def: 0,   hue: true },
+  { id: 15, name: 'Насыщенность',          min: 0,   max: 255,  def: 255 },
+  { id: 16, name: 'Период смены цвета',    min: 0,   max: 255,  def: 100, unit: 'мс' },
+  { id: 17, name: 'Скорость радуги',       min: -20, max: 20,   def: 1,   hint: 'Знак — направление, 0 — стоп' },
+  { id: 18, name: 'Шаг радуги',            min: 5,   max: 100,  def: 5,   scale: 10 },
+  { id: 19, name: 'Период сдвига',         min: 1,   max: 255,  def: 11,  unit: 'мс' },
+  { id: 20, name: 'Начальный цвет',        min: 0,   max: 255,  def: 0,   hue: true },
+  { id: 21, name: 'Шаг цвета',             min: 1,   max: 255,  def: 5 },
+];
+const P_MODE = 0, P_POWER = 1, P_LIGHT_MODE = 13;
+
+const MODES = [
+  { name: 'Громкость: градиент',  params: [6],          thumb: 'linear-gradient(90deg,#f00,#f80,#ff0,#0f0,#ff0,#f80,#f00)' },
+  { name: 'Громкость: радуга',    params: [6, 7],       thumb: 'linear-gradient(90deg,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00)' },
+  { name: 'Цветомузыка: 5 полос', params: [8, 9],       thumb: 'linear-gradient(90deg,#fd0 20%,#2c4 20% 40%,#f22 40% 60%,#2c4 60% 80%,#fd0 80%)' },
+  { name: 'Цветомузыка: 3 полосы', params: [8, 9],      thumb: 'linear-gradient(90deg,#fd0 33%,#2c4 33% 66%,#f22 66%)' },
+  { name: 'Вспышки',              params: [10, 8, 9],   thumb: 'linear-gradient(90deg,#2c4,#2c4)' },
+  { name: 'Стробоскоп',           params: [11, 12],     thumb: 'repeating-linear-gradient(90deg,#fff 0 10px,#222 10px 22px)' },
+  { name: 'Подсветка',            params: [13],         thumb: 'linear-gradient(90deg,#a4f,#f4a)' },
+  { name: 'Бегущие частоты',      params: [10, 19, 9, 8], thumb: 'linear-gradient(90deg,#f22,#2c4,#fd0,#2c4,#f22)' },
+  { name: 'Анализатор спектра',   params: [20, 21],     thumb: 'linear-gradient(90deg,#f00 0 8%,#333 8% 14%,#fa0 14% 30%,#333 30% 36%,#ff0 36% 64%,#333 64% 70%,#fa0 70% 86%,#333 86% 92%,#f00 92%)' },
+];
+const LIGHT_SUB = { 0: [14, 15], 1: [16, 15], 2: [17, 18] };
+const GENERAL = [2, 3];
+const NOISE = [4, 5];
+
+const values = P.map(p => p.def);
+let link = null;           // транспорт: { send(bytes), close() }
+let dragging = null;       // id параметра, который сейчас тянут - не перезаписываем его ответами платы
+
+// ---------- журнал ----------
+const logEl = document.getElementById('log');
+function log(dir, bytes, text) {
+  const hex = [...bytes].map(b => b.toString(16).padStart(2, '0')).join(' ');
+  logEl.textContent = `${dir} ${hex}${text ? '  ' + text : ''}\n` + logEl.textContent.slice(0, 6000);
+}
+
+// ---------- отправка ----------
+function packet(cmd, id = 0, value = 0) {
+  const v = value & 0xFFFF;
+  return new Uint8Array([START, cmd, id, v & 0xFF, v >> 8]);
+}
+function send(cmd, id, value) {
+  if (!link) return;
+  const bytes = packet(cmd, id, value);
+  log('→', bytes);
+  link.send(bytes);
+}
+
+// слайдеры шлют не чаще раза в 40 мс, последнее значение отправляется всегда
+const throttles = {};
+function sendThrottled(id, value) {
+  const t = throttles[id] || (throttles[id] = { timer: null, value: 0, last: 0 });
+  t.value = value;
+  const wait = 40 - (performance.now() - t.last);
+  if (wait <= 0) { t.last = performance.now(); send(CMD.SET, id, value); return; }
+  if (!t.timer) t.timer = setTimeout(() => {
+    t.timer = null; t.last = performance.now(); send(CMD.SET, id, t.value);
+  }, wait);
+}
+
+// ---------- приём ----------
+const rx = [];
+function onBytes(chunk) {
+  rx.push(...chunk);
+  while (rx.length >= 5) {
+    if (rx[0] !== START) { rx.shift(); continue; }
+    const pkt = rx.splice(0, 5);
+    if (pkt[1] !== CMD.VALUE) continue;
+    const id = pkt[2];
+    let v = pkt[3] | (pkt[4] << 8);
+    if (v & 0x8000) v -= 0x10000;
+    log('←', pkt, P[id] ? `${P[id].name} = ${v}` : '');
+    if (id < values.length) setValue(id, v);
+  }
+}
+
+function setValue(id, v) {
+  const changedLayout = values[id] !== v && (id === P_MODE || id === P_LIGHT_MODE);
+  values[id] = v;
+  if (changedLayout) renderMode();
+  if (id !== dragging) updateControl(id);
+  if (id === P_MODE) renderModes();
+  if (id === P_POWER) renderPower();
+}
+
+// ---------- транспорт Web Serial ----------
+async function connectSerial(port) {
+  port = port || await navigator.serial.requestPort();
+  await port.open({ baudRate: 9600 });
+  const writer = port.writable.getWriter();
+  const reader = port.readable.getReader();
+  let alive = true;
+  link = {
+    port,
+    send: bytes => writer.write(bytes),
+    async close() {
+      alive = false;
+      try { await reader.cancel(); } catch (e) {}
+      reader.releaseLock(); writer.releaseLock();
+      try { await port.close(); } catch (e) {}
+    },
+  };
+  (async () => {
+    try {
+      while (alive) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        if (value) onBytes(value);
+      }
+    } catch (e) { log('!', [], 'ошибка чтения: ' + e.message); }
+    if (alive) disconnect('соединение потеряно');
+  })();
+  setStatus('подключение… (плата перезагружается)', false);
+  await new Promise(r => setTimeout(r, 2200));   // Uno/Nano перезагружается при открытии порта
+  if (link && link.port === port) {
+    setStatus('подключено по USB', true);
+    send(CMD.GET, 0xFF);
+  }
+}
+
+// ---------- транспорт через сервер-мост (web/server.py): плата подключена к другому компьютеру ----------
+function connectBridge() {
+  const es = new EventSource('api/events');
+  let chain = Promise.resolve();      // POST-запросы по очереди, чтобы команды не перепутались
+  link = {
+    bridge: true,
+    send: bytes => { chain = chain.then(() => fetch('api/send', { method: 'POST', body: bytes })).catch(() => {}); },
+    close() { es.close(); },
+  };
+  setStatus('подключение к серверу…', false);
+  es.addEventListener('status', e => {
+    const online = e.data === 'online';
+    setStatus(online ? 'подключено через сервер' :
+      e.data === 'none' ? 'на сервере плата не подключена' : 'сервер работает, плата недоступна', online);
+    if (online) send(CMD.GET, 0xFF);
+  });
+  es.onmessage = e => onBytes(e.data.match(/../g).map(h => parseInt(h, 16)));
+  es.onerror = () => { if (link && link.bridge) setStatus('нет связи с сервером, переподключаюсь…', false); };
+}
+
+// ---------- демо: виртуальная плата с той же логикой ответов ----------
+function connectDemo() {
+  const dev = P.map(p => p.def);
+  const reply = (id) => setTimeout(() => {
+    const v = dev[id] & 0xFFFF;
+    onBytes([START, CMD.VALUE, id, v & 0xFF, v >> 8]);
+  }, 15);
+  const set = (id, v) => {
+    if (id >= dev.length) return;
+    dev[id] = Math.min(P[id].max, Math.max(P[id].min, v));
+    reply(id);
+  };
+  link = {
+    send(b) {
+      const [, cmd, id, lo, hi] = b;
+      let v = lo | (hi << 8); if (v & 0x8000) v -= 0x10000;
+      if (cmd === CMD.SET) set(id, v);
+      else if (cmd === CMD.ADD) set(id, dev[id] + v);
+      else if (cmd === CMD.GET) (id === 0xFF ? dev.map((_, i) => i) : [id]).forEach(reply);
+      else if (cmd === CMD.RESET) P.forEach(p => set(p.id, p.def));
+      else if (cmd === CMD.CALIBRATE) { set(4, 90 + Math.round(Math.random() * 30)); set(5, 30 + Math.round(Math.random() * 15)); }
+    },
+    close() {},
+  };
+  setStatus('демо-режим', true);
+  send(CMD.GET, 0xFF);
+}
+
+async function disconnect(reason) {
+  const l = link; link = null;
+  if (l) await l.close();
+  setStatus(reason || 'не подключено', false);
+}
+
+// ---------- интерфейс ----------
+const $ = id => document.getElementById(id);
+
+function setStatus(text, on) {
+  $('status').className = 'status' + (on ? ' on' : '');
+  $('status').lastElementChild.textContent = text;
+  $('app').classList.toggle('offline', !on);
+  renderSources();
+}
+
+function fmt(p, v) {
+  if (p.options) return p.options[v] ?? v;
+  const s = p.scale ? (v / p.scale).toFixed(p.scale === 100 ? 2 : 1) : String(v);
+  return p.unit ? `${s} ${p.unit}` : s;
+}
+const hueCss = v => `hsl(${Math.round(v * 360 / 256)} 90% 55%)`;
+
+function paramControl(id) {
+  const p = P[id];
+  const el = document.createElement('div');
+  el.className = 'param';
+  el.dataset.param = id;
+  if (p.options) {
+    el.innerHTML = `<div class="head"><span>${p.name}</span></div><div class="seg"></div>`;
+    p.options.forEach((label, i) => {
+      const b = document.createElement('button');
+      b.textContent = label;
+      b.onclick = () => { setValue(id, i); send(CMD.SET, id, i); };
+      el.querySelector('.seg').append(b);
+    });
+  } else {
+    el.innerHTML = `<div class="head"><span>${p.hue ? '<span class="swatch"></span>' : ''}${p.name}</span><span class="val"></span></div>
+      <input type="range" min="${p.min}" max="${p.max}" step="1" ${p.hue ? 'class="hue"' : ''}>
+      ${p.hint ? `<div class="hint">${p.hint}</div>` : ''}`;
+    const input = el.querySelector('input');
+    input.oninput = () => {
+      dragging = id;
+      values[id] = +input.value;
+      updateControl(id, true);
+      sendThrottled(id, +input.value);
+    };
+    input.onchange = () => { dragging = null; };
+  }
+  return el;
+}
+
+function updateControl(id, keepInput) {
+  const p = P[id], v = values[id];
+  document.querySelectorAll(`[data-param="${id}"]`).forEach(el => {
+    if (p.options) {
+      el.querySelectorAll('.seg button').forEach((b, i) => b.classList.toggle('active', i === v));
+      return;
+    }
+    if (!keepInput) el.querySelector('input').value = v;
+    el.querySelector('.val').textContent = fmt(p, v);
+    const sw = el.querySelector('.swatch');
+    if (sw) sw.style.background = hueCss(v);
+  });
+}
+
+function fill(container, ids) {
+  container.replaceChildren(...ids.map(paramControl));
+  ids.forEach(id => updateControl(id));
+}
+
+function renderModes() {
+  const box = $('modes');
+  if (!box.children.length) {
+    MODES.forEach((m, i) => {
+      const b = document.createElement('button');
+      b.className = 'mode';
+      b.innerHTML = `<div class="thumb" style="background:${m.thumb}"></div><b>${i + 1}. ${m.name}</b>`;
+      b.onclick = () => send(CMD.SET, P_MODE, i);
+      box.append(b);
+    });
+  }
+  [...box.children].forEach((b, i) => b.classList.toggle('active', i === values[P_MODE]));
+}
+
+function renderMode() {
+  const mode = MODES[values[P_MODE]] || MODES[0];
+  $('modeTitle').textContent = 'Настройки: ' + mode.name;
+  let ids = mode.params;
+  if (values[P_MODE] === 6) ids = [P_LIGHT_MODE, ...LIGHT_SUB[values[P_LIGHT_MODE]] || []];
+  fill($('modeParams'), ids);
+}
+
+function renderPower() {
+  const on = values[P_POWER] === 1;
+  $('btnPower').textContent = on ? 'Включено' : 'Выключено';
+  $('btnPower').classList.toggle('on', on);
+}
+
+$('btnPower').onclick = () => send(CMD.SET, P_POWER, values[P_POWER] ? 0 : 1);
+$('btnSave').onclick = () => send(CMD.SAVE);
+$('btnReset').onclick = () => { if (confirm('Вернуть все настройки по умолчанию?')) send(CMD.RESET); };
+$('btnCalibrate').onclick = () => send(CMD.CALIBRATE);
+// ---------- источник подключения ----------
+const SOURCE_KEY = 'colormusic-source';
+let source = null;          // выбранный источник: bridge / serial / demo
+let serverInfo = null;      // ответ /api/info, если страница открыта через web/server.py
+
+function sourceAvailable(src) {
+  if (src === 'bridge') return !!serverInfo;
+  if (src === 'serial') return 'serial' in navigator;
+  return true;
+}
+
+// подпись под кнопкой источника: что это, или почему недоступен
+function sourceNote(src) {
+  if (src === 'bridge') return serverInfo ? 'плата у компьютера с web/server.py' : 'страница открыта не с сервера';
+  if (src === 'serial') {
+    if ('serial' in navigator) return 'плата у этого компьютера';
+    return window.isSecureContext ? 'нужен Chrome, Edge или Opera' : 'нужен HTTPS';
+  }
+  return 'виртуальная плата';
+}
+
+function renderSources() {
+  const connected = !!link;
+  document.querySelectorAll('#sources button').forEach(b => {
+    const src = b.dataset.src;
+    b.classList.toggle('active', src === source);
+    b.disabled = !sourceAvailable(src);
+    b.querySelector('small').textContent = sourceNote(src);
+  });
+  const btn = $('btnConnect');
+  btn.textContent = connected ? 'Отключить' : 'Подключить';
+  btn.disabled = !connected && !(source && sourceAvailable(source));
+}
+
+async function connect(src, port) {
+  if (link) await disconnect();
+  source = src;
+  localStorage.setItem(SOURCE_KEY, src);
+  renderSources();
+  try {
+    if (src === 'bridge') connectBridge();
+    else if (src === 'serial') await connectSerial(port);
+    else connectDemo();
+  } catch (e) {
+    link = null;
+    log('!', [], e.message);
+    setStatus(e.name === 'NotFoundError' ? 'порт не выбран' : 'ошибка: ' + e.message, false);
+  }
+}
+
+document.querySelectorAll('#sources button').forEach(b => {
+  b.onclick = () => connect(b.dataset.src);     // клик = жест пользователя, можно открыть выбор порта
+});
+$('btnConnect').onclick = () => link ? disconnect() : connect(source);
+
+async function loadServerInfo() {
+  if (location.protocol === 'file:') return null;
+  try {
+    const r = await fetch('api/info');
+    return r.ok ? await r.json() : null;
+  } catch (e) { return null; }
+}
+
+if ('serial' in navigator) {
+  navigator.serial.addEventListener('disconnect', e => {
+    if (link && link.port === e.target) disconnect('плата отключена от USB');
+  });
+}
+
+fill($('general'), GENERAL);
+fill($('noise'), NOISE);
+renderModes();
+renderMode();
+renderPower();
+renderSources();
+
+(async () => {
+  serverInfo = await loadServerInfo();
+  if (location.hash === '#demo') return connect('demo');
+  const saved = localStorage.getItem(SOURCE_KEY);
+  // USB без диалога можно открыть, только если порт уже разрешали раньше
+  if (saved === 'serial' && sourceAvailable('serial')) {
+    const [port] = await navigator.serial.getPorts();
+    if (port) return connect('serial', port);
+  }
+  if (saved === 'demo') return connect('demo');
+  if (serverInfo && serverInfo.serial) return connect('bridge');
+  source = saved && sourceAvailable(saved) ? saved : (sourceAvailable('serial') ? 'serial' : null);
+  renderSources();
+})();
+</script>
+</body>
+</html>
